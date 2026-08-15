@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify Email · Shelfmark</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card" style="text-align:center;">
+    <span class="eyebrow">Member desk</span>
+    <div id="spinner" class="spinner" style="width:22px; height:22px; margin:0 auto 1rem;"></div>
+    <h1 id="heading">Verifying your email…</h1>
+    <p class="lede" id="message">Hold on a moment while we confirm your verification link.</p>
+
+    <a href="login.html" class="btn btn--brass btn--block" id="login-link" style="display:none;">
+      Go to sign in
+    </a>
+
+    <div class="auth-foot">
+      <a href="../index.html">&larr; Back to portal chooser</a>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  const spinner = document.getElementById("spinner");
+  const heading = document.getElementById("heading");
+  const message = document.getElementById("message");
+  const loginLink = document.getElementById("login-link");
+
+  // verification link points here as verify-email.html?token=abc123
+  const token = new URLSearchParams(window.location.search).get("token");
+
+  async function run() {
+    if (!token) {
+      spinner.style.display = "none";
+      heading.textContent = "Missing verification link";
+      message.textContent = "This page needs a verification token in the URL. Please use the link from your email.";
+      return;
+    }
+
+    try {
+      const res = await apiRequest("/library/member/verify_email?token=" + encodeURIComponent(token), "POST");
+      spinner.style.display = "none";
+      heading.textContent = "Email verified";
+      heading.style.color = "var(--sage)";
+      message.textContent = res.message || "Your account has been verified. You can sign in now.";
+      loginLink.style.display = "inline-flex";
+    } catch (err) {
+      spinner.style.display = "none";
+      heading.textContent = "Verification failed";
+      heading.style.color = "var(--stamp-red)";
+      message.textContent = err.message;
+    }
+  }
+
+  run();
+</script>
+</body>
+</html>

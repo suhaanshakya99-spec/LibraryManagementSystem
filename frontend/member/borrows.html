@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Borrows &amp; Requests · Shelfmark</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html">Shelfmark</a>
+    <span class="brand-sub">Member desk</span>
+
+    <ul class="nav">
+      <li><a href="dashboard.html">Overview</a></li>
+      <li><a href="books.html">Browse books</a></li>
+      <li><a href="borrows.html" class="active">My borrows &amp; requests</a></li>
+    </ul>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-user" id="sidebar-user">—</div>
+      <a href="#" class="btn btn--ghost-ink btn--sm btn--block" id="sign-out">Sign out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <span class="eyebrow">Your account</span>
+      <h1>Borrows &amp; requests</h1>
+      <p>Everything you currently have out, and anything waiting on a librarian's approval.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>My borrows</h2></div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Book</th><th>Borrowed</th><th>Due</th><th>Status</th></tr>
+          </thead>
+          <tbody id="borrows-body">
+            <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>My requests</h2></div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Book</th><th>Requested</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="requests-body">
+            <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  requireMemberAuth();
+  document.getElementById("sign-out").addEventListener("click", (e) => {
+    e.preventDefault();
+    signOut("member");
+  });
+
+  const payload = decodeJwt(getToken("member"));
+  document.getElementById("sidebar-user").textContent = (payload && payload.email) || "Signed in";
+
+  async function loadBorrows() {
+    const body = document.getElementById("borrows-body");
+    try {
+      const borrows = await apiRequest("/library/member/borrows/mine", "GET", null, "member");
+      if (borrows.length === 0) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="4">You haven't borrowed any books yet.</td></tr>`;
+        return;
+      }
+      body.innerHTML = borrows
+        .map(
+          (b) => `
+        <tr>
+          <td>${escapeHtml(b.books.title)}</td>
+          <td class="mono">${formatDate(b.borrow_date)}</td>
+          <td class="mono">${formatDate(b.due_date)}</td>
+          <td>${stampBadge(b.status)}</td>
+        </tr>`
+        )
+        .join("");
+    } catch (err) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="4">Could not load your borrows.</td></tr>`;
+      toast(err.message, "error");
+    }
+  }
+
+  async function loadRequests() {
+    const body = document.getElementById("requests-body");
+    try {
+      const requests = await apiRequest("/library/member/request/mine", "GET", null, "member");
+      if (requests.length === 0) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="4">You haven't requested any books yet.</td></tr>`;
+        return;
+      }
+      body.innerHTML = requests
+        .map(
+          (r) => `
+        <tr>
+          <td>${escapeHtml(r.book.title)}</td>
+          <td class="mono">${formatDate(r.request_date)}</td>
+          <td>${stampBadge(r.status)}</td>
+          <td class="row-actions">
+            ${
+              r.status === "Pending"
+                ? `<button class="btn btn--danger btn--sm" data-cancel="${r.id}">Cancel</button>`
+                : ""
+            }
+          </td>
+        </tr>`
+        )
+        .join("");
+
+      body.querySelectorAll("[data-cancel]").forEach((btn) => {
+        btn.addEventListener("click", () => cancelRequest(Number(btn.dataset.cancel), btn));
+      });
+    } catch (err) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="4">Could not load your requests.</td></tr>`;
+      toast(err.message, "error");
+    }
+  }
+
+  async function cancelRequest(id, btn) {
+    if (!confirm("Cancel this request?")) return;
+    btn.disabled = true;
+    try {
+      await apiRequest("/library/member/requests/" + id, "DELETE", null, "member");
+      toast("Request cancelled.", "success");
+      loadRequests();
+    } catch (err) {
+      toast(err.message, "error");
+      btn.disabled = false;
+    }
+  }
+
+  loadBorrows();
+  loadRequests();
+</script>
+</body>
+</html>

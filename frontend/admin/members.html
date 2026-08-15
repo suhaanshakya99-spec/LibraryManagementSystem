@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Members · Shelfmark Staff</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html">Shelfmark</a>
+    <span class="brand-sub">Staff desk</span>
+
+    <ul class="nav">
+      <li><a href="dashboard.html">Overview</a></li>
+      <li><a href="books.html">Books</a></li>
+      <li><a href="members.html" class="active">Members</a></li>
+      <li><a href="borrows.html">Borrows &amp; requests</a></li>
+    </ul>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-user">Signed in as staff</div>
+      <a href="#" class="btn btn--ghost-ink btn--sm btn--block" id="sign-out">Sign out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <span class="eyebrow">People</span>
+      <h1>Members</h1>
+      <p>New members are created here — they'll get an email to verify their address before they can sign in.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Add a member</h2></div>
+      <div class="panel-body">
+        <div id="error-box" class="error-box"></div>
+        <form id="member-form">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem;">
+            <div class="field">
+              <label for="name">Name</label>
+              <input type="text" id="name" required placeholder="Jordan Rivers">
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input type="email" id="email" required placeholder="jordan@example.com">
+            </div>
+            <div class="field">
+              <label for="password">Temporary password</label>
+              <input type="text" id="password" required placeholder="Given to the member directly">
+            </div>
+          </div>
+          <button type="submit" class="btn btn--brass" id="submit-btn">Add member</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>All members</h2>
+        <input type="search" id="search" placeholder="Search name or email" style="max-width:220px; padding:0.5rem 0.7rem; border:1px solid var(--paper-line); border-radius:4px; font-family:var(--font-body);">
+      </div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Membership expires</th><th>Verified</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="members-body">
+            <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  requireAdminAuth();
+  document.getElementById("sign-out").addEventListener("click", (e) => {
+    e.preventDefault();
+    signOut("admin");
+  });
+
+  let allMembers = [];
+
+  const form = document.getElementById("member-form");
+  const errorBox = document.getElementById("error-box");
+  const submitBtn = document.getElementById("submit-btn");
+
+  function renderMembers(list) {
+    const body = document.getElementById("members-body");
+    if (list.length === 0) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="6">No members yet — add the first one above.</td></tr>`;
+      return;
+    }
+    body.innerHTML = list
+      .map(
+        (m) => `
+      <tr>
+        <td>${escapeHtml(m.name)}</td>
+        <td>${escapeHtml(m.email)}</td>
+        <td class="mono">${formatDate(m.membership_expiry)}</td>
+        <td>${m.is_verified ? stampBadge("Approved") : stampBadge("Pending")}</td>
+        <td>${stampBadge(m.status)}</td>
+        <td class="row-actions">
+          <button class="btn btn--ghost btn--sm" data-toggle="${m.id}">
+            ${m.status === "Active" ? "Deactivate" : "Reactivate"}
+          </button>
+          <button class="btn btn--danger btn--sm" data-delete="${m.id}">Delete</button>
+        </td>
+      </tr>`
+      )
+      .join("");
+
+    body.querySelectorAll("[data-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => toggleStatus(Number(btn.dataset.toggle), btn));
+    });
+    body.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteMember(Number(btn.dataset.delete)));
+    });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+    submitBtn.disabled = true;
+
+    const payload = {
+      name: document.getElementById("name").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      password: document.getElementById("password").value,
+    };
+
+    try {
+      await apiRequest("/library/admin/members/", "POST", payload, "admin");
+      toast("Member added — a verification email has been sent.", "success");
+      form.reset();
+      loadMembers();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("show");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  async function toggleStatus(id, btn) {
+    const member = allMembers.find((m) => m.id === id);
+    if (!member) return;
+    const nextStatus = member.status === "Active" ? "Inactive" : "Active";
+    btn.disabled = true;
+    try {
+      await apiRequest("/library/admin/members/id/" + id, "PATCH", { status: nextStatus }, "admin");
+      toast(nextStatus === "Active" ? "Member reactivated." : "Member deactivated.", "success");
+      loadMembers();
+    } catch (err) {
+      toast(err.message, "error");
+      btn.disabled = false;
+    }
+  }
+
+  async function deleteMember(id) {
+    const member = allMembers.find((m) => m.id === id);
+    if (!confirm("Delete " + (member ? member.name : "this member") + "? This cannot be undone.")) return;
+    try {
+      await apiRequest("/library/admin/members/id/" + id, "DELETE", null, "admin");
+      toast("Member deleted.", "success");
+      loadMembers();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function loadMembers() {
+    try {
+      allMembers = await apiRequest("/library/admin/members/", "GET", null, "admin");
+      applySearch();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  function applySearch() {
+    const q = document.getElementById("search").value.trim().toLowerCase();
+    if (!q) return renderMembers(allMembers);
+    renderMembers(
+      allMembers.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
+    );
+  }
+
+  document.getElementById("search").addEventListener("input", applySearch);
+
+  loadMembers();
+</script>
+</body>
+</html>
