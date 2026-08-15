@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Books · Shelfmark Staff</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html">Shelfmark</a>
+    <span class="brand-sub">Staff desk</span>
+
+    <ul class="nav">
+      <li><a href="dashboard.html">Overview</a></li>
+      <li><a href="books.html" class="active">Books</a></li>
+      <li><a href="members.html">Members</a></li>
+      <li><a href="borrows.html">Borrows &amp; requests</a></li>
+    </ul>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-user">Signed in as staff</div>
+      <a href="#" class="btn btn--ghost-ink btn--sm btn--block" id="sign-out">Sign out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <span class="eyebrow">Catalog</span>
+      <h1>Books</h1>
+      <p>Add new titles to the collection, and edit or retire existing ones.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2 id="form-title">Add a book</h2></div>
+      <div class="panel-body">
+        <div id="error-box" class="error-box"></div>
+        <form id="book-form">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem;">
+            <div class="field">
+              <label for="title">Title</label>
+              <input type="text" id="title" required placeholder="The Left Hand of Darkness">
+            </div>
+            <div class="field">
+              <label for="author">Author</label>
+              <input type="text" id="author" required placeholder="Ursula K. Le Guin">
+            </div>
+            <div class="field">
+              <label for="category">Category</label>
+              <input type="text" id="category" required placeholder="Science Fiction">
+            </div>
+          </div>
+          <div class="gap-sm">
+            <button type="submit" class="btn btn--brass" id="submit-btn">Add book</button>
+            <button type="button" class="btn btn--ghost" id="cancel-edit" style="display:none;">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>All books</h2>
+        <input type="search" id="search" placeholder="Search title, author, category" style="max-width:220px; padding:0.5rem 0.7rem; border:1px solid var(--paper-line); border-radius:4px; font-family:var(--font-body);">
+      </div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Title</th><th>Author</th><th>Category</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="books-body">
+            <tr class="empty-row"><td colspan="5">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  requireAdminAuth();
+  document.getElementById("sign-out").addEventListener("click", (e) => {
+    e.preventDefault();
+    signOut("admin");
+  });
+
+  let allBooks = [];
+  let editingId = null;
+
+  const form = document.getElementById("book-form");
+  const errorBox = document.getElementById("error-box");
+  const submitBtn = document.getElementById("submit-btn");
+  const cancelBtn = document.getElementById("cancel-edit");
+  const formTitle = document.getElementById("form-title");
+
+  function renderBooks(list) {
+    const body = document.getElementById("books-body");
+    if (list.length === 0) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="5">No books yet — add the first one above.</td></tr>`;
+      return;
+    }
+    body.innerHTML = list
+      .map(
+        (b) => `
+      <tr>
+        <td>${escapeHtml(b.title)}</td>
+        <td>${escapeHtml(b.author)}</td>
+        <td>${escapeHtml(b.category)}</td>
+        <td>${stampBadge(b.status)}</td>
+        <td class="row-actions">
+          <button class="btn btn--ghost btn--sm" data-edit="${b.id}">Edit</button>
+          <button class="btn btn--danger btn--sm" data-delete="${b.id}">Delete</button>
+        </td>
+      </tr>`
+      )
+      .join("");
+
+    body.querySelectorAll("[data-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => startEdit(Number(btn.dataset.edit)));
+    });
+    body.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteBook(Number(btn.dataset.delete)));
+    });
+  }
+
+  function startEdit(id) {
+    const book = allBooks.find((b) => b.id === id);
+    if (!book) return;
+    editingId = id;
+    document.getElementById("title").value = book.title;
+    document.getElementById("author").value = book.author;
+    document.getElementById("category").value = book.category;
+    formTitle.textContent = `Edit “${book.title}”`;
+    submitBtn.textContent = "Save changes";
+    cancelBtn.style.display = "inline-flex";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    formTitle.textContent = "Add a book";
+    submitBtn.textContent = "Add book";
+    cancelBtn.style.display = "none";
+  }
+
+  cancelBtn.addEventListener("click", resetForm);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+    submitBtn.disabled = true;
+
+    const payload = {
+      title: document.getElementById("title").value.trim(),
+      author: document.getElementById("author").value.trim(),
+      category: document.getElementById("category").value.trim(),
+    };
+
+    try {
+      if (editingId) {
+        await apiRequest("/library/admin/book/id/" + editingId, "PATCH", payload, "admin");
+        toast("Book updated.", "success");
+      } else {
+        await apiRequest("/library/admin/book/", "POST", payload, "admin");
+        toast("Book added.", "success");
+      }
+      resetForm();
+      loadBooks();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("show");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  async function deleteBook(id) {
+    const book = allBooks.find((b) => b.id === id);
+    if (!confirm("Delete “" + (book ? book.title : "this book") + "”? This cannot be undone.")) return;
+    try {
+      await apiRequest("/library/admin/book/id/" + id, "DELETE", null, "admin");
+      toast("Book deleted.", "success");
+      loadBooks();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function loadBooks() {
+    try {
+      allBooks = await apiRequest("/library/admin/book/books", "GET", null, "admin");
+      applySearch();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  function applySearch() {
+    const q = document.getElementById("search").value.trim().toLowerCase();
+    if (!q) return renderBooks(allBooks);
+    renderBooks(
+      allBooks.filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.author.toLowerCase().includes(q) ||
+          b.category.toLowerCase().includes(q)
+      )
+    );
+  }
+
+  document.getElementById("search").addEventListener("input", applySearch);
+
+  loadBooks();
+</script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Borrows &amp; Requests · Shelfmark Staff</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html">Shelfmark</a>
+    <span class="brand-sub">Staff desk</span>
+
+    <ul class="nav">
+      <li><a href="dashboard.html">Overview</a></li>
+      <li><a href="books.html">Books</a></li>
+      <li><a href="members.html">Members</a></li>
+      <li><a href="borrows.html" class="active">Borrows &amp; requests</a></li>
+    </ul>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-user">Signed in as staff</div>
+      <a href="#" class="btn btn--ghost-ink btn--sm btn--block" id="sign-out">Sign out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <span class="eyebrow">Circulation</span>
+      <h1>Borrows &amp; requests</h1>
+      <p>Approve or reject member requests, and manage borrows directly.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Requests awaiting review</h2></div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Book</th><th>Member</th><th>Requested</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="requests-body">
+            <tr class="empty-row"><td colspan="5">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Record a manual borrow</h2></div>
+      <div class="panel-body">
+        <div id="error-box" class="error-box"></div>
+        <form id="borrow-form">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+            <div class="field">
+              <label for="book-select">Book</label>
+              <select id="book-select" required></select>
+            </div>
+            <div class="field">
+              <label for="member-select">Member</label>
+              <select id="member-select" required></select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn--brass" id="submit-btn">Record borrow</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>All borrows</h2></div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Book</th><th>Member</th><th>Borrowed</th><th>Due</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="borrows-body">
+            <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  requireAdminAuth();
+  document.getElementById("sign-out").addEventListener("click", (e) => {
+    e.preventDefault();
+    signOut("admin");
+  });
+
+  let allBorrows = [];
+
+  // --- requests ---
+  async function loadRequests() {
+    const body = document.getElementById("requests-body");
+    try {
+      const requests = await apiRequest("/library/admin/borrows/requests", "GET", null, "admin");
+      const pending = requests.filter((r) => r.status === "Pending");
+
+      if (pending.length === 0) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="5">No requests waiting on review.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = pending
+        .map(
+          (r) => `
+        <tr>
+          <td>${escapeHtml(r.book.title)}</td>
+          <td>${escapeHtml(r.member.name)}</td>
+          <td class="mono">${formatDate(r.request_date)}</td>
+          <td>${stampBadge(r.status)}</td>
+          <td class="row-actions">
+            <button class="btn btn--brass btn--sm" data-approve="${r.id}">Approve</button>
+            <button class="btn btn--danger btn--sm" data-reject="${r.id}">Reject</button>
+          </td>
+        </tr>`
+        )
+        .join("");
+
+      body.querySelectorAll("[data-approve]").forEach((btn) => {
+        btn.addEventListener("click", () => decideRequest(Number(btn.dataset.approve), "Approved", btn));
+      });
+      body.querySelectorAll("[data-reject]").forEach((btn) => {
+        btn.addEventListener("click", () => decideRequest(Number(btn.dataset.reject), "Reject", btn));
+      });
+    } catch (err) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="5">Could not load requests.</td></tr>`;
+      toast(err.message, "error");
+    }
+  }
+
+  async function decideRequest(id, status, btn) {
+    btn.disabled = true;
+    try {
+      // approving automatically creates the matching borrow on the backend
+      await apiRequest("/library/admin/borrows/requests?id=" + id, "PUT", { status: status }, "admin");
+      toast(status === "Approved" ? "Request approved and borrow recorded." : "Request rejected.", "success");
+      loadRequests();
+      loadBorrows();
+      populateSelects();
+    } catch (err) {
+      toast(err.message, "error");
+      btn.disabled = false;
+    }
+  }
+
+  // --- borrows ---
+  function renderBorrows(list) {
+    const body = document.getElementById("borrows-body");
+    if (list.length === 0) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="6">No borrows recorded yet.</td></tr>`;
+      return;
+    }
+    body.innerHTML = list
+      .map(
+        (b) => `
+      <tr>
+        <td>${escapeHtml(b.books.title)}</td>
+        <td>${escapeHtml(b.members.name)}</td>
+        <td class="mono">${formatDate(b.borrow_date)}</td>
+        <td class="mono">${formatDate(b.due_date)}</td>
+        <td>${stampBadge(b.status)}</td>
+        <td class="row-actions">
+          ${
+            b.status !== "Returned"
+              ? `<button class="btn btn--ghost btn--sm" data-return="${b.id}">Mark returned</button>`
+              : ""
+          }
+          <button class="btn btn--danger btn--sm" data-delete="${b.id}">Delete</button>
+        </td>
+      </tr>`
+      )
+      .join("");
+
+    body.querySelectorAll("[data-return]").forEach((btn) => {
+      btn.addEventListener("click", () => markReturned(Number(btn.dataset.return), btn));
+    });
+    body.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteBorrow(Number(btn.dataset.delete)));
+    });
+  }
+
+  async function markReturned(id, btn) {
+    btn.disabled = true;
+    try {
+      await apiRequest("/library/admin/borrows/id/" + id, "PATCH", { status: "Returned" }, "admin");
+      toast("Marked as returned.", "success");
+      loadBorrows();
+      populateSelects();
+    } catch (err) {
+      toast(err.message, "error");
+      btn.disabled = false;
+    }
+  }
+
+  async function deleteBorrow(id) {
+    if (!confirm("Delete this borrow record? This cannot be undone.")) return;
+    try {
+      await apiRequest("/library/admin/borrows/id/" + id, "DELETE", null, "admin");
+      toast("Borrow record deleted.", "success");
+      loadBorrows();
+      populateSelects();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function loadBorrows() {
+    try {
+      allBorrows = await apiRequest("/library/admin/borrows/", "GET", null, "admin");
+      renderBorrows(allBorrows);
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  // --- manual borrow form ---
+  async function populateSelects() {
+    const bookSelect = document.getElementById("book-select");
+    const memberSelect = document.getElementById("member-select");
+    try {
+      const books = await apiRequest("/library/admin/book/books", "GET", null, "admin");
+      const members = await apiRequest("/library/admin/members/", "GET", null, "admin");
+
+      const available = books.filter((b) => b.status === "Available");
+      bookSelect.innerHTML = available.length
+        ? available.map((b) => `<option value="${b.id}">${escapeHtml(b.title)} — ${escapeHtml(b.author)}</option>`).join("")
+        : `<option value="">No available books</option>`;
+
+      const active = members.filter((m) => m.status === "Active");
+      memberSelect.innerHTML = active.length
+        ? active.map((m) => `<option value="${m.id}">${escapeHtml(m.name)} (${escapeHtml(m.email)})</option>`).join("")
+        : `<option value="">No active members</option>`;
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  const borrowForm = document.getElementById("borrow-form");
+  const errorBox = document.getElementById("error-box");
+  const submitBtn = document.getElementById("submit-btn");
+
+  borrowForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+
+    const bookId = Number(document.getElementById("book-select").value);
+    const memberId = Number(document.getElementById("member-select").value);
+    if (!bookId || !memberId) {
+      errorBox.textContent = "Pick both a book and a member.";
+      errorBox.classList.add("show");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      await apiRequest("/library/admin/borrows/", "POST", { book_id: bookId, member_id: memberId }, "admin");
+      toast("Borrow recorded.", "success");
+      loadBorrows();
+      populateSelects();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("show");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  loadRequests();
+  loadBorrows();
+  populateSelects();
+</script>
+</body>
+</html>

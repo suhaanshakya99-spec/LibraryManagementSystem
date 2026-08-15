@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Member Sign In · Shelfmark</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <span class="eyebrow">Member desk</span>
+    <h1>Sign in</h1>
+    <p class="lede">Use the email and password your librarian set up for you.</p>
+
+    <div id="error-box" class="error-box"></div>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" required autocomplete="username" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" required autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn--brass btn--block" id="submit-btn">Sign in</button>
+    </form>
+
+    <div class="auth-foot">
+      Need to verify your email? <a href="verify-email.html">Verify here</a><br>
+      <span class="text-dim">New members are added by library staff.</span><br>
+      <a href="../index.html">&larr; Back to portal chooser</a>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  // already signed in - skip straight to the dashboard
+  if (getToken("member")) window.location.href = "dashboard.html";
+
+  const form = document.getElementById("login-form");
+  const errorBox = document.getElementById("error-box");
+  const submitBtn = document.getElementById("submit-btn");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span> Signing in…';
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    try {
+      // login endpoint expects OAuth2 form fields (username/password)
+      const data = await apiRequest("/library/member/login/", "POST", { username: email, password: password }, null, true);
+      saveTokens("member", data.access_token, data.refresh_token);
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("show");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign in";
+    }
+  });
+</script>
+</body>
+</html>

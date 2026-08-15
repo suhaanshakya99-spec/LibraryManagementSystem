@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Books · Shelfmark</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html">Shelfmark</a>
+    <span class="brand-sub">Member desk</span>
+
+    <ul class="nav">
+      <li><a href="dashboard.html">Overview</a></li>
+      <li><a href="books.html" class="active">Browse books</a></li>
+      <li><a href="borrows.html">My borrows &amp; requests</a></li>
+    </ul>
+
+    <div class="sidebar-foot">
+      <div class="sidebar-user" id="sidebar-user">—</div>
+      <a href="#" class="btn btn--ghost-ink btn--sm btn--block" id="sign-out">Sign out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <span class="eyebrow">Catalog</span>
+      <h1>Browse books</h1>
+      <p>Send a request to borrow any available title — a librarian will approve it at the desk.</p>
+    </div>
+
+    <div class="field" style="max-width:320px;">
+      <label for="search">Search</label>
+      <input type="search" id="search" placeholder="Title, author, or category">
+    </div>
+
+    <div class="panel">
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Title</th><th>Author</th><th>Category</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="books-body">
+            <tr class="empty-row"><td colspan="5">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+  requireMemberAuth();
+  document.getElementById("sign-out").addEventListener("click", (e) => {
+    e.preventDefault();
+    signOut("member");
+  });
+
+  const payload = decodeJwt(getToken("member"));
+  document.getElementById("sidebar-user").textContent = (payload && payload.email) || "Signed in";
+
+  let allBooks = [];
+
+  function renderBooks(list) {
+    const body = document.getElementById("books-body");
+
+    if (list.length === 0) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="5">No books match your search.</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = list
+      .map(
+        (b) => `
+      <tr>
+        <td>${escapeHtml(b.title)}</td>
+        <td>${escapeHtml(b.author)}</td>
+        <td>${escapeHtml(b.category)}</td>
+        <td>${stampBadge(b.status)}</td>
+        <td class="row-actions">
+          <button class="btn btn--brass btn--sm" data-request="${b.id}" ${b.status !== "Available" ? "disabled" : ""}>
+            Request
+          </button>
+        </td>
+      </tr>`
+      )
+      .join("");
+
+    body.querySelectorAll("[data-request]").forEach((btn) => {
+      btn.addEventListener("click", () => requestBook(Number(btn.dataset.request), btn));
+    });
+  }
+
+  async function requestBook(bookId, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      // member_id is just a placeholder - the backend always uses the logged-in member's own id
+      await apiRequest("/library/member/request", "POST", { book_id: bookId, member_id: 0 }, "member");
+      toast("Request sent — a librarian will review it soon.", "success");
+    } catch (err) {
+      toast(err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Request";
+    }
+  }
+
+  async function load() {
+    try {
+      allBooks = await apiRequest("/library/member/books", "GET", null, "member");
+      renderBooks(allBooks);
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  document.getElementById("search").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) return renderBooks(allBooks);
+    renderBooks(
+      allBooks.filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.author.toLowerCase().includes(q) ||
+          b.category.toLowerCase().includes(q)
+      )
+    );
+  });
+
+  load();
+</script>
+</body>
+</html>
