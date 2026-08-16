@@ -1,32 +1,23 @@
-/* =========================================================================
-   Shelfmark — shared stylesheet
-   -------------------------------------------------------------------------
-   Design concept: a library circulation desk. Dark "reading room" ink for
-   navigation/structure, warm ledger-paper for content, brass for actions,
-   and a rubber-stamp badge style (rotated, monospace, bordered) for every
-   status a book/request/borrow can have — the one signature element that
-   repeats everywhere a status appears.
-   ========================================================================= */
+/* Shelfmark — shared stylesheet */
 
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 :root {
-  /* ---- palette --------------------------------------------------------- */
-  --ink: #182620;          /* deep forest-black: sidebar, headers, hero */
-  --ink-soft: #24352c;     /* raised panels on ink */
-  --ink-line: #3a4d42;     /* hairlines on ink */
-  --paper: #f1ecdd;        /* ledger paper: main content background */
-  --paper-2: #e8e0c8;      /* stripes / recessed panels on paper */
-  --paper-line: #d8cdab;   /* hairlines on paper */
-  --ink-text: #efe9d8;     /* body text on ink */
-  --ink-text-dim: #a9b8ae; /* muted text on ink */
-  --paper-text: #241f14;   /* body text on paper */
-  --paper-text-dim: #6b6350;/* muted text on paper */
-  --brass: #b8925a;        /* primary accent / actions */
-  --brass-dark: #8f6f42;   /* brass hover/active */
-  --stamp-red: #a23e32;    /* overdue / destructive / rejected */
+  --ink: #182620;
+  --ink-soft: #24352c;
+  --ink-line: #3a4d42;
+  --paper: #f1ecdd;
+  --paper-2: #e8e0c8;
+  --paper-line: #d8cdab;
+  --ink-text: #efe9d8;
+  --ink-text-dim: #a9b8ae;
+  --paper-text: #241f14;
+  --paper-text-dim: #6b6350;
+  --brass: #b8925a;
+  --brass-dark: #8f6f42;
+  --stamp-red: #a23e32;
   --stamp-red-soft: #f4e3df;
-  --sage: #5f7a63;         /* available / approved / success */
+  --sage: #5f7a63;
   --sage-soft: #e4ead9;
   --brass-soft: #f2e6d1;
 
@@ -70,9 +61,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
   text-transform: uppercase;
 }
 
-/* =========================================================================
-   Landing page (portal chooser)
-   ========================================================================= */
+/* Landing page (portal chooser) */
 .landing {
   min-height: 100vh;
   background: var(--ink);
@@ -112,9 +101,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
 .desk-card h3 { font-size: 1.3rem; margin-bottom: 0.5rem; }
 .desk-card p { color: var(--ink-text-dim); font-size: 0.92rem; margin: 0; }
 
-/* =========================================================================
-   Auth pages (login / verify)
-   ========================================================================= */
+/* Auth pages (login / verify) */
 .auth-shell {
   min-height: 100vh;
   background: var(--ink);
@@ -148,9 +135,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
 .auth-foot a { color: var(--brass-dark); font-weight: 600; text-decoration: none; }
 .auth-foot a:hover { text-decoration: underline; }
 
-/* =========================================================================
-   Forms
-   ========================================================================= */
+/* Forms */
 .field { margin-bottom: 1.1rem; }
 .field label {
   display: block;
@@ -178,9 +163,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
 }
 .field-hint { font-size: 0.78rem; color: var(--paper-text-dim); margin-top: 0.35rem; }
 
-/* =========================================================================
-   Buttons
-   ========================================================================= */
+/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -222,9 +205,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* =========================================================================
-   App shell (dashboard/books/members/borrows pages)
-   ========================================================================= */
+/* App shell (dashboard/books/members/borrows pages) */
 .app {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -290,13 +271,11 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
 
 .page-head { margin-bottom: 1.75rem; }
 .page-head .eyebrow { color: var(--brass-dark); display: block; margin-bottom: 0.35rem; }
-.page-head h1 { font-size: 1.9rem; }
+.page-head h1 { font-size: clamp(1.5rem, 5vw, 1.9rem); }
 .page-head p { color: var(--paper-text-dim); margin-top: 0.4rem; max-width: 60ch; }
 .page-head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 
-/* =========================================================================
-   Stat tiles (dashboard)
-   ========================================================================= */
+/* Stat tiles (dashboard) */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -309,7 +288,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
   border-radius: var(--radius);
   padding: 1.1rem 1.2rem;
 }
-.stat-tile .value { font-family: var(--font-display); font-size: 2rem; display: block; }
+.stat-tile .value { font-family: var(--font-display); font-size: clamp(1.5rem, 5vw, 2rem); display: block; }
 .stat-tile .label {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -318,9 +297,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
   color: var(--paper-text-dim);
 }
 
-/* =========================================================================
-   Cards / panels
-   ========================================================================= */
+/* Cards / panels */
 .panel {
   background: #fffdf6;
   border: 1px solid var(--paper-line);
@@ -339,9 +316,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; }
 .panel-head h2 { font-size: 1.05rem; }
 .panel-body { padding: 1.25rem; }
 
-/* =========================================================================
-   Tables
-   ========================================================================= */
+/* Tables */
 .table-scroll { overflow-x: auto; }
 table.ledger { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 table.ledger th {
@@ -365,9 +340,7 @@ table.ledger .num, table.ledger .mono { font-family: var(--font-mono); font-size
 table.ledger .row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .empty-row td { color: var(--paper-text-dim); text-align: center; padding: 2rem 1rem; font-style: italic; }
 
-/* =========================================================================
-   Signature element: stamp badges for status
-   ========================================================================= */
+/* Signature element: stamp badges for status */
 .stamp {
   display: inline-block;
   font-family: var(--font-mono);
@@ -387,9 +360,7 @@ table.ledger .row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .stamp--active { color: var(--sage); background: var(--sage-soft); }
 .stamp--inactive { color: var(--stamp-red); background: var(--stamp-red-soft); }
 
-/* =========================================================================
-   Alerts / empty states
-   ========================================================================= */
+/* Alerts / empty states */
 .error-box, .info-box {
   display: none;
   border-radius: var(--radius);
@@ -409,9 +380,7 @@ table.ledger .row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 }
 .empty-state h3 { font-size: 1.1rem; color: var(--paper-text); margin-bottom: 0.4rem; }
 
-/* =========================================================================
-   Toasts
-   ========================================================================= */
+/* Toasts */
 #toast-host {
   position: fixed;
   bottom: 1.25rem;
@@ -438,10 +407,16 @@ table.ledger .row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .toast--error { border-left-color: var(--stamp-red); }
 .toast--success { border-left-color: var(--sage); }
 
-/* =========================================================================
-   Utility
-   ========================================================================= */
+/* Utility */
 .mt-lg { margin-top: 2rem; }
 .text-dim { color: var(--paper-text-dim); }
 .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .gap-sm { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+@media (max-width: 560px) {
+  .auth-card { padding: 1.75rem 1.25rem; }
+  table.ledger th, table.ledger td { padding: 0.6rem 0.75rem; font-size: 0.85rem; }
+  #toast-host { left: 1rem; right: 1rem; bottom: 1rem; }
+  .toast { max-width: none; }
+  .panel-body { padding: 1rem; }
+}
